@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #212121;
+  background: #f8f9fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@layer components {
+  .category-pill {
+    @apply shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-brand-green hover:text-brand-green;
+  }
+
+  .category-pill-active {
+    @apply shrink-0 rounded-lg border border-brand-green bg-brand-green px-4 py-3 text-sm font-black text-white shadow-soft;
+  }
+}
