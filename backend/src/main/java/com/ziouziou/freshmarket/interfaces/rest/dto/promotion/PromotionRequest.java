@@ -30,7 +30,9 @@ public record PromotionRequest(
         OffsetDateTime endsAt,
 
         boolean active,
-        Set<Long> productIds
+        Set<Long> productIds,
+
+        Long categoryId
 ) {
 }
 

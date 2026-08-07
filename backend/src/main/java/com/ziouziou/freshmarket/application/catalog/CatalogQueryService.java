@@ -2,6 +2,7 @@ package com.ziouziou.freshmarket.application.catalog;
 
 import com.ziouziou.freshmarket.application.exception.BusinessException;
 import com.ziouziou.freshmarket.application.exception.ResourceNotFoundException;
+import com.ziouziou.freshmarket.application.promotion.PromotionPricingService;
 import com.ziouziou.freshmarket.domain.catalog.Category;
 import com.ziouziou.freshmarket.domain.catalog.Product;
 import com.ziouziou.freshmarket.domain.promotion.Promotion;
@@ -31,6 +32,7 @@ public class CatalogQueryService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final PromotionRepository promotionRepository;
+    private final PromotionPricingService promotionPricingService;
     private final StoreRepository storeRepository;
     private final Long defaultStoreId;
 
@@ -38,11 +40,13 @@ public class CatalogQueryService {
             CategoryRepository categoryRepository,
             ProductRepository productRepository,
             PromotionRepository promotionRepository,
+            PromotionPricingService promotionPricingService,
             StoreRepository storeRepository
     ) {
         this.categoryRepository = categoryRepository;
         this.productRepository = productRepository;
         this.promotionRepository = promotionRepository;
+        this.promotionPricingService = promotionPricingService;
         this.storeRepository = storeRepository;
         this.defaultStoreId = storeRepository.findFirstByActiveTrueOrderByIdAsc()
                 .map(Store::getId)
@@ -59,15 +63,18 @@ public class CatalogQueryService {
     public PageResponse<ProductResponse> getProducts(String search, String categorySlug, Pageable pageable) {
         Page<Product> products;
         if (StringUtils.hasText(search)) {
-            products = productRepository.findByStoreIdAndActiveTrueAndNameContainingIgnoreCase(defaultStoreId, search.trim(), pageable);
+            products = productRepository.searchByNameUnaccent(defaultStoreId, search.trim(), pageable);
         } else if (StringUtils.hasText(categorySlug)) {
             products = productRepository.findByStoreIdAndActiveTrueAndCategorySlug(defaultStoreId, categorySlug.trim(), pageable);
         } else {
             products = productRepository.findByStoreIdAndActiveTrue(defaultStoreId, pageable);
         }
 
+        java.util.Map<Long, java.math.BigDecimal> promoPrices = promotionPricingService.effectivePrices(
+                defaultStoreId, products.getContent(), OffsetDateTime.now());
+
         return new PageResponse<>(
-                products.map(this::toProductResponse).getContent(),
+                products.map(p -> toProductResponse(p, promoPrices.get(p.getId()))).getContent(),
                 products.getNumber(),
                 products.getSize(),
                 products.getTotalElements(),
@@ -78,16 +85,19 @@ public class CatalogQueryService {
     }
 
     public ProductResponse getProduct(String slug) {
-        return productRepository.findByStoreIdAndSlug(defaultStoreId, slug)
+        Product product = productRepository.findByStoreIdAndSlug(defaultStoreId, slug)
                 .filter(Product::isActive)
-                .map(this::toProductResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Produit", slug));
+        java.math.BigDecimal promoPrice = promotionPricingService.effectivePrice(
+                defaultStoreId, product, OffsetDateTime.now());
+        return toProductResponse(product, promoPrice);
     }
 
     public List<ProductResponse> getFeaturedProducts(Pageable pageable) {
-        return productRepository.findByStoreIdAndActiveTrueAndFeaturedTrue(defaultStoreId, pageable)
-                .map(this::toProductResponse)
-                .getContent();
+        Page<Product> products = productRepository.findByStoreIdAndActiveTrueAndFeaturedTrue(defaultStoreId, pageable);
+        java.util.Map<Long, java.math.BigDecimal> promoPrices = promotionPricingService.effectivePrices(
+                defaultStoreId, products.getContent(), OffsetDateTime.now());
+        return products.map(p -> toProductResponse(p, promoPrices.get(p.getId()))).getContent();
     }
 
     public List<ProductResponse> getSimilarProducts(String slug, Pageable pageable) {
@@ -95,10 +105,14 @@ public class CatalogQueryService {
                 .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Produit", slug));
 
-        return productRepository.findByStoreIdAndActiveTrueAndCategorySlug(defaultStoreId, product.getCategory().getSlug(), pageable)
+        List<Product> candidates = productRepository.findByStoreIdAndActiveTrueAndCategorySlug(defaultStoreId, product.getCategory().getSlug(), pageable)
                 .stream()
                 .filter(candidate -> !candidate.getSlug().equals(slug))
-                .map(this::toProductResponse)
+                .toList();
+        java.util.Map<Long, java.math.BigDecimal> promoPrices = promotionPricingService.effectivePrices(
+                defaultStoreId, candidates, OffsetDateTime.now());
+        return candidates.stream()
+                .map(candidate -> toProductResponse(candidate, promoPrices.get(candidate.getId())))
                 .toList();
     }
 
@@ -122,7 +136,10 @@ public class CatalogQueryService {
         );
     }
 
-    private ProductResponse toProductResponse(Product product) {
+    private ProductResponse toProductResponse(Product product, java.math.BigDecimal promoPrice) {
+        java.math.BigDecimal basePrice = product.getPrice();
+        java.math.BigDecimal displayPrice = promoPrice != null ? promoPrice : basePrice;
+        java.math.BigDecimal displayOldPrice = promoPrice != null ? basePrice : product.getOldPrice();
         return new ProductResponse(
                 product.getId(),
                 product.getCategory().getId(),
@@ -133,8 +150,8 @@ public class CatalogQueryService {
                 product.getBrand(),
                 product.getSku(),
                 product.getUnitLabel(),
-                product.getPrice(),
-                product.getOldPrice(),
+                displayPrice,
+                displayOldPrice,
                 product.getImageUrl(),
                 product.isActive(),
                 product.isFeatured(),

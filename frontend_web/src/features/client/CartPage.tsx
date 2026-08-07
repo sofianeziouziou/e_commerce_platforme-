@@ -67,7 +67,7 @@ export function CartPage() {
 
   const handleClear = async () => {
     if (!token) return;
-    try { await clearCart(token); setCart({ id: 0, items: [], subtotal: 0 }); }
+    try { await clearCart(token); setCart({ id: 0, items: [], subtotal: 0, deliveryFee: 0, discountAmount: 0, totalAmount: 0 }); }
     catch (e) { setError((e as Error).message); }
   };
 

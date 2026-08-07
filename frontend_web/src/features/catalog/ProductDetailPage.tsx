@@ -95,7 +95,7 @@ export function ProductDetailPage() {
               {isAvailable(product) ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-emerald-700">En stock</span> : null}
             </div>
             <h1 className="text-3xl font-black leading-tight text-brand-ink sm:text-5xl">{product.name}</h1>
-            <p className="mt-3 text-base font-bold text-slate-500">{product.brand ?? 'FreshMarket'} · {product.unitLabel} · SKU {product.sku}</p>
+            <p className="mt-3 text-base font-bold text-slate-500">{product.brand ?? 'FreshMarket'} · {product.unitLabel}{product.sku ? ` · SKU ${product.sku}` : ''}</p>
             <p className="mt-5 text-lg leading-8 text-slate-700">{product.description}</p>
 
             <div className="mt-7 rounded-lg bg-slate-50 p-5">

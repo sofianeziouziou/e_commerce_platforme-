@@ -61,8 +61,8 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     public Map<String, String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        String token = authService.forgotPassword(request);
-        return Map.of("message", "Si un compte existe avec cet email, un lien de reinitialisation a ete envoye.", "token", token);
+        authService.forgotPassword(request);
+        return Map.of("message", "Si un compte existe avec cet email, un lien de reinitialisation a ete envoye.");
     }
 
     @PostMapping("/reset-password")

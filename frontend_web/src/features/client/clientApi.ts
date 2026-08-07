@@ -27,6 +27,9 @@ export type CartResponse = {
   id: number;
   items: CartItemResponse[];
   subtotal: number;
+  deliveryFee: number;
+  discountAmount: number;
+  totalAmount: number;
 };
 
 export type AddressResponse = {

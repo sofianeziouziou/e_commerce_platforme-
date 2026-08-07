@@ -148,7 +148,7 @@ export function AdminProductsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`font-bold ${p.stock != null && p.stock <= 5 ? 'text-red-600' : p.stock != null && p.stock <= 10 ? 'text-orange-600' : 'text-slate-700'}`}>
+                    <span className={`font-bold ${p.stock != null && p.stock <= (p.lowStockThreshold ?? 5) ? 'text-red-600' : p.stock != null && p.stock <= 10 ? 'text-orange-600' : 'text-slate-700'}`}>
                       {p.stock != null ? `${p.stock}` : '-'}
                     </span>
                   </td>

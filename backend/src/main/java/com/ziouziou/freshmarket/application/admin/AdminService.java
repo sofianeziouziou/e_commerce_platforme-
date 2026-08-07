@@ -1,8 +1,10 @@
 package com.ziouziou.freshmarket.application.admin;
 
 import com.ziouziou.freshmarket.application.exception.BusinessException;
+import com.ziouziou.freshmarket.application.exception.ConflictException;
 import com.ziouziou.freshmarket.domain.notification.NotificationService;
 import com.ziouziou.freshmarket.domain.notification.NotificationType;
+import com.ziouziou.freshmarket.domain.promotion.DiscountType;
 import com.ziouziou.freshmarket.interfaces.rest.dto.admin.DashboardSummaryResponse;
 import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.CategoryCreateRequest;
 import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.CategoryUpdateRequest;
@@ -10,6 +12,10 @@ import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.ProductCreateRequest
 import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.ProductUpdateRequest;
 import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.UpdateInventoryRequest;
 import com.ziouziou.freshmarket.interfaces.rest.dto.order.UpdateOrderStatusRequest;
+import com.ziouziou.freshmarket.interfaces.rest.dto.promotion.PromotionRequest;
+import jakarta.persistence.EntityNotFoundException;
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -49,12 +55,12 @@ public class AdminService {
                     (SELECT COUNT(*) FROM products WHERE store_id = ?) AS totalProducts,
                     (SELECT COUNT(*) FROM products WHERE store_id = ? AND active = TRUE) AS activeProducts,
                     (SELECT COUNT(*) FROM inventory i JOIN products p ON p.id = i.product_id WHERE p.store_id = ? AND i.quantity <= i.low_stock_threshold) AS lowStockProducts,
-                    (SELECT COUNT(*) FROM orders WHERE store_id = ? AND status = 'PENDING') AS pendingOrders,
-                    (SELECT COUNT(*) FROM orders WHERE store_id = ? AND status = 'DELIVERED') AS deliveredOrders,
+                    (SELECT COUNT(*) FROM orders WHERE store_id = ? AND status = 'EN_ATTENTE') AS pendingOrders,
+                    (SELECT COUNT(*) FROM orders WHERE store_id = ? AND status = 'LIVREE') AS deliveredOrders,
                     (SELECT COUNT(*) FROM orders WHERE store_id = ? AND created_at::date = CURRENT_DATE) AS todayOrders,
                     (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE store_id = ?) AS totalCustomers,
                     (SELECT COUNT(*) FROM promotions WHERE store_id = ? AND active = TRUE AND CURRENT_TIMESTAMP BETWEEN starts_at AND ends_at) AS activePromotions,
-                    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE store_id = ? AND status = 'DELIVERED') AS totalRevenue
+                    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE store_id = ? AND status = 'LIVREE') AS totalRevenue
                 """, rs -> {
             if (rs.next()) return new DashboardSummaryResponse(
                     rs.getLong("totalProducts"), rs.getLong("activeProducts"),
@@ -72,15 +78,17 @@ public class AdminService {
         return jdbcTemplate.query("""
                 SELECT id, name, slug, description, image_url, active, display_order, created_at
                 FROM categories WHERE store_id = ? ORDER BY display_order ASC, name ASC
-                """, (rs, rowNum) -> new java.util.HashMap<>(java.util.Map.of(
-                "id", rs.getLong("id"),
-                "name", rs.getString("name"),
-                "slug", rs.getString("slug"),
-                "description", rs.getString("description"),
-                "imageUrl", rs.getString("image_url"),
-                "active", rs.getBoolean("active"),
-                "displayOrder", rs.getInt("display_order")
-        )), storeId);
+                """, (rs, rowNum) -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", rs.getLong("id"));
+            map.put("name", rs.getString("name"));
+            map.put("slug", rs.getString("slug"));
+            map.put("description", rs.getString("description"));
+            map.put("imageUrl", rs.getString("image_url"));
+            map.put("active", rs.getBoolean("active"));
+            map.put("displayOrder", rs.getInt("display_order"));
+            return map;
+        }, storeId);
     }
 
     public java.util.Map<String, Object> createCategory(Long userId, CategoryCreateRequest request) {
@@ -102,16 +110,26 @@ public class AdminService {
     public java.util.Map<String, Object> updateCategory(Long userId, Long categoryId, CategoryUpdateRequest request) {
         Long storeId = resolveStoreId(userId);
         verifyOwnership("categories", categoryId, storeId, "Categorie");
+        String existingSlug = jdbcTemplate.query(
+                "SELECT slug FROM categories WHERE id = ?",
+                rs -> rs.next() ? rs.getString("slug") : null, categoryId);
         jdbcTemplate.update("""
                 UPDATE categories SET name = ?, description = ?, image_url = ?, active = ?, display_order = ?
                 WHERE id = ?
                 """, request.name(), request.description(), request.imageUrl(), request.active(), request.displayOrder(), categoryId);
-        return categoryMap(categoryId, storeId, request.name(), null, request.description(), request.imageUrl(), request.active(), request.displayOrder());
+        return categoryMap(categoryId, storeId, request.name(), existingSlug, request.description(), request.imageUrl(), request.active(), request.displayOrder());
     }
 
     public void deleteCategory(Long userId, Long categoryId) {
         Long storeId = resolveStoreId(userId);
         verifyOwnership("categories", categoryId, storeId, "Categorie");
+        Integer productCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM products WHERE category_id = ?",
+                Integer.class, categoryId);
+        if (productCount != null && productCount > 0) {
+            throw new BusinessException("CATEGORY_HAS_PRODUCTS",
+                    "Impossible de supprimer cette categorie : des produits y sont rattaches.");
+        }
         jdbcTemplate.update("DELETE FROM categories WHERE id = ?", categoryId);
     }
 
@@ -123,19 +141,21 @@ public class AdminService {
             return jdbcTemplate.query("""
                     SELECT p.id, p.name, p.slug, p.description, p.brand, p.sku, p.unit_label,
                            p.price, p.old_price, p.image_url, p.active, p.featured,
-                           c.name AS category_name, i.quantity AS stock,
+                           p.category_id, c.name AS category_name, i.quantity AS stock,
+                           i.low_stock_threshold,
                            p.created_at, p.updated_at
                     FROM products p
                     JOIN categories c ON c.id = p.category_id
                     LEFT JOIN inventory i ON i.product_id = p.id
-                    WHERE p.store_id = ? AND LOWER(p.name) LIKE LOWER(?)
+                    WHERE p.store_id = ? AND unaccent(lower(p.name)) LIKE unaccent(lower(?))
                     ORDER BY p.created_at DESC LIMIT ? OFFSET ?
                     """, (rs, rowNum) -> productMap(rs), storeId, "%" + search + "%", size, offset);
         }
         return jdbcTemplate.query("""
                 SELECT p.id, p.name, p.slug, p.description, p.brand, p.sku, p.unit_label,
                        p.price, p.old_price, p.image_url, p.active, p.featured,
-                       c.name AS category_name, i.quantity AS stock,
+                       p.category_id, c.name AS category_name, i.quantity AS stock,
+                       i.low_stock_threshold,
                        p.created_at, p.updated_at
                 FROM products p
                 JOIN categories c ON c.id = p.category_id
@@ -186,6 +206,13 @@ public class AdminService {
     public void deleteProduct(Long userId, Long productId) {
         Long storeId = resolveStoreId(userId);
         verifyOwnership("products", productId, storeId, "Produit");
+        Integer cartRefCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cart_items WHERE product_id = ?",
+                Integer.class, productId);
+        if (cartRefCount != null && cartRefCount > 0) {
+            throw new BusinessException("PRODUCT_IN_CART",
+                    "Impossible de supprimer ce produit : il est present dans des paniers.");
+        }
         jdbcTemplate.update("DELETE FROM products WHERE id = ?", productId);
     }
 
@@ -237,9 +264,47 @@ public class AdminService {
 
         String newStatus = request.status().name();
 
+        if (!currentStatus.equals(newStatus) && !isValidStatusTransition(currentStatus, newStatus)) {
+            throw new ConflictException("INVALID_STATUS_TRANSITION",
+                    "Transition de statut invalide : impossible de passer de \"" + currentStatus
+                            + "\" a \"" + newStatus + "\".");
+        }
+
         if ("CONFIRMEE".equals(newStatus) && "EN_ATTENTE".equals(currentStatus)) {
+            List<java.util.Map<String, Object>> stockNeeds = jdbcTemplate.query("""
+                    SELECT oi.product_id, oi.product_name, oi.quantity,
+                           COALESCE(i.quantity, 0) AS available
+                    FROM order_items oi
+                    LEFT JOIN inventory i ON i.product_id = oi.product_id
+                    WHERE oi.order_id = ? AND oi.product_id IS NOT NULL
+                    """, (rs, rowNum) -> {
+                var map = new java.util.HashMap<String, Object>();
+                map.put("productId", rs.getLong("product_id"));
+                map.put("productName", rs.getString("product_name"));
+                map.put("quantity", rs.getBigDecimal("quantity"));
+                map.put("available", rs.getBigDecimal("available"));
+                return map;
+            }, orderId);
+            for (java.util.Map<String, Object> need : stockNeeds) {
+                java.math.BigDecimal qty = (java.math.BigDecimal) need.get("quantity");
+                java.math.BigDecimal avail = (java.math.BigDecimal) need.get("available");
+                if (avail.compareTo(qty) < 0) {
+                    throw new BusinessException("INSUFFICIENT_STOCK",
+                            "Stock insuffisant pour \"" + need.get("productName") + "\" (disponible : "
+                                    + avail.stripTrailingZeros().toPlainString()
+                                    + ", demande : " + qty.stripTrailingZeros().toPlainString() + ").");
+                }
+            }
             jdbcTemplate.update("""
                     UPDATE inventory i SET quantity = i.quantity - oi.quantity
+                    FROM order_items oi
+                    WHERE oi.order_id = ? AND i.product_id = oi.product_id
+                    """, orderId);
+        }
+
+        if ("ANNULEE".equals(newStatus) && !"EN_ATTENTE".equals(currentStatus) && !"ANNULEE".equals(currentStatus)) {
+            jdbcTemplate.update("""
+                    UPDATE inventory i SET quantity = i.quantity + oi.quantity
                     FROM order_items oi
                     WHERE oi.order_id = ? AND i.product_id = oi.product_id
                     """, orderId);
@@ -268,11 +333,18 @@ public class AdminService {
                     NotificationType.ORDER_STATUS);
         }
 
-        return jdbcTemplate.queryForMap("""
+        return jdbcTemplate.query("""
                 SELECT o.id, o.order_number, o.status, o.subtotal_amount, o.delivery_fee,
-                       o.discount_amount, o.total_amount, o.customer_note, o.created_at
-                FROM orders o WHERE o.id = ?
-                """, orderId);
+                       o.discount_amount, o.total_amount, o.customer_note, o.created_at,
+                       u.email AS customer_email, u.first_name || ' ' || u.last_name AS customer_name
+                FROM orders o
+                JOIN customers c ON c.id = o.customer_id
+                JOIN users u ON u.id = c.user_id
+                WHERE o.id = ?
+                """, rs -> {
+            if (rs.next()) return orderMap(rs);
+            throw new EntityNotFoundException("Commande introuvable");
+        }, orderId);
     }
 
     @Transactional(readOnly = true)
@@ -357,7 +429,7 @@ public class AdminService {
         return jdbcTemplate.query("""
                 SELECT p.id, p.name, p.description, p.discount_type AS discountType,
                        p.discount_value AS discountValue, p.starts_at AS startsAt,
-                       p.ends_at AS endsAt, p.active,
+                       p.ends_at AS endsAt, p.active, p.category_id AS categoryId,
                        (SELECT COUNT(*) FROM product_promotions pp WHERE pp.promotion_id = p.id) AS productCount
                 FROM promotions p
                 WHERE p.store_id = ?
@@ -369,12 +441,143 @@ public class AdminService {
             map.put("description", rs.getString("description"));
             map.put("discountType", rs.getString("discountType"));
             map.put("discountValue", rs.getBigDecimal("discountValue"));
-            map.put("startsAt", rs.getObject("startsAt", java.time.OffsetDateTime.class).toString());
-            map.put("endsAt", rs.getObject("endsAt", java.time.OffsetDateTime.class).toString());
+            map.put("startsAt", rs.getObject("startsAt", OffsetDateTime.class).toString());
+            map.put("endsAt", rs.getObject("endsAt", OffsetDateTime.class).toString());
             map.put("active", rs.getBoolean("active"));
+            map.put("categoryId", rs.getObject("categoryId"));
             map.put("productCount", rs.getLong("productCount"));
             return map;
         }, storeId);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getPromotionDetail(Long userId, Long promotionId) {
+        Long storeId = resolveStoreId(userId);
+        verifyOwnership("promotions", promotionId, storeId, "Promotion");
+        var row = jdbcTemplate.query("""
+                SELECT id, name, description, discount_type, discount_value, starts_at, ends_at, active, category_id
+                FROM promotions WHERE id = ?
+                """, rs -> {
+            if (!rs.next()) throw new BusinessException("NOT_FOUND", "Promotion introuvable.");
+            var map = new java.util.HashMap<String, Object>();
+            map.put("id", rs.getLong("id"));
+            map.put("name", rs.getString("name"));
+            map.put("description", rs.getString("description"));
+            map.put("discountType", rs.getString("discount_type"));
+            map.put("discountValue", rs.getBigDecimal("discount_value"));
+            map.put("startsAt", rs.getObject("starts_at", OffsetDateTime.class).toString());
+            map.put("endsAt", rs.getObject("ends_at", OffsetDateTime.class).toString());
+            map.put("active", rs.getBoolean("active"));
+            map.put("categoryId", rs.getObject("category_id"));
+            return map;
+        }, promotionId);
+        List<Long> productIds = jdbcTemplate.query(
+                "SELECT product_id FROM product_promotions WHERE promotion_id = ? ORDER BY product_id",
+                (rs, rowNum) -> rs.getLong("product_id"), promotionId);
+        row.put("productIds", productIds);
+        return row;
+    }
+
+    public java.util.Map<String, Object> createPromotion(Long userId, PromotionRequest request) {
+        Long storeId = resolveStoreId(userId);
+        validatePromotion(request);
+        Long categoryId = request.categoryId();
+        if (categoryId != null) {
+            verifyCategoryStore(storeId, categoryId);
+        }
+        Long promotionId = insertAndReturnId("""
+                INSERT INTO promotions (store_id, name, description, discount_type, discount_value,
+                    starts_at, ends_at, active, category_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, storeId, request.name(), request.description(), request.discountType().name(),
+                request.discountValue(), request.startsAt(), request.endsAt(), request.active(), categoryId);
+        savePromotionProducts(storeId, promotionId, request);
+        return promotionMap(promotionId, storeId, request);
+    }
+
+    public java.util.Map<String, Object> updatePromotion(Long userId, Long promotionId, PromotionRequest request) {
+        Long storeId = resolveStoreId(userId);
+        verifyOwnership("promotions", promotionId, storeId, "Promotion");
+        validatePromotion(request);
+        Long categoryId = request.categoryId();
+        if (categoryId != null) {
+            verifyCategoryStore(storeId, categoryId);
+        }
+        jdbcTemplate.update("""
+                UPDATE promotions SET name = ?, description = ?, discount_type = ?, discount_value = ?,
+                    starts_at = ?, ends_at = ?, active = ?, category_id = ?
+                WHERE id = ?
+                """, request.name(), request.description(), request.discountType().name(),
+                request.discountValue(), request.startsAt(), request.endsAt(), request.active(),
+                categoryId, promotionId);
+        jdbcTemplate.update("DELETE FROM product_promotions WHERE promotion_id = ?", promotionId);
+        savePromotionProducts(storeId, promotionId, request);
+        return promotionMap(promotionId, storeId, request);
+    }
+
+    public void deletePromotion(Long userId, Long promotionId) {
+        Long storeId = resolveStoreId(userId);
+        verifyOwnership("promotions", promotionId, storeId, "Promotion");
+        jdbcTemplate.update("DELETE FROM promotions WHERE id = ?", promotionId);
+    }
+
+    private void savePromotionProducts(Long storeId, Long promotionId, PromotionRequest request) {
+        List<Long> productIds;
+        if (request.categoryId() != null) {
+            productIds = jdbcTemplate.query(
+                    "SELECT id FROM products WHERE category_id = ? AND store_id = ? AND active = TRUE",
+                    (rs, rowNum) -> rs.getLong("id"), request.categoryId(), storeId);
+        } else {
+            productIds = request.productIds() == null
+                    ? List.of()
+                    : request.productIds().stream().toList();
+        }
+        for (Long productId : productIds) {
+            jdbcTemplate.update(
+                    "INSERT INTO product_promotions (product_id, promotion_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                    productId, promotionId);
+        }
+    }
+
+    private void validatePromotion(PromotionRequest request) {
+        if (request.endsAt() == null || request.startsAt() == null
+                || !request.endsAt().isAfter(request.startsAt())) {
+            throw new BusinessException("INVALID_PROMOTION_DATES",
+                    "La date de fin doit etre posterieure a la date de debut.");
+        }
+        if (request.discountType() == DiscountType.PERCENTAGE
+                && request.discountValue().compareTo(new BigDecimal("100")) > 0) {
+            throw new BusinessException("INVALID_DISCOUNT_VALUE",
+                    "Le pourcentage de remise ne peut pas depasser 100%.");
+        }
+    }
+
+    private java.util.Map<String, Object> promotionMap(Long promotionId, Long storeId, PromotionRequest request) {
+        Integer productCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM product_promotions WHERE promotion_id = ?", Integer.class, promotionId);
+        var map = new java.util.HashMap<String, Object>();
+        map.put("id", promotionId);
+        map.put("storeId", storeId);
+        map.put("name", request.name());
+        map.put("description", request.description());
+        map.put("discountType", request.discountType().name());
+        map.put("discountValue", request.discountValue());
+        map.put("startsAt", request.startsAt().toString());
+        map.put("endsAt", request.endsAt().toString());
+        map.put("active", request.active());
+        map.put("categoryId", request.categoryId());
+        map.put("productCount", productCount == null ? 0L : productCount.longValue());
+        return map;
+    }
+
+    private boolean isValidStatusTransition(String current, String target) {
+        return switch (current) {
+            case "EN_ATTENTE" -> "CONFIRMEE".equals(target) || "ANNULEE".equals(target);
+            case "CONFIRMEE" -> "EN_PREPARATION".equals(target) || "ANNULEE".equals(target);
+            case "EN_PREPARATION" -> "EXPEDIEE".equals(target) || "ANNULEE".equals(target);
+            case "EXPEDIEE" -> "LIVREE".equals(target) || "ANNULEE".equals(target);
+            default -> false;
+        };
     }
 
     @Transactional(readOnly = true)
@@ -465,20 +668,26 @@ public class AdminService {
         map.put("imageUrl", rs.getString("image_url")); map.put("active", rs.getBoolean("active"));
         map.put("featured", rs.getBoolean("featured"));
         map.put("categoryName", rs.getString("category_name"));
+        map.put("categoryId", rs.getObject("category_id"));
         map.put("stock", rs.getBigDecimal("stock"));
+        map.put("lowStockThreshold", rs.getBigDecimal("low_stock_threshold"));
         return map;
     }
 
     private java.util.Map<String, Object> productMapFromDb(Long productId) {
-        return jdbcTemplate.queryForMap("""
+        return jdbcTemplate.query("""
                 SELECT p.id, p.name, p.slug, p.description, p.brand, p.sku, p.unit_label,
                        p.price, p.old_price, p.image_url, p.active, p.featured,
-                       p.category_id, c.name AS category_name, i.quantity AS stock
+                       p.category_id, c.name AS category_name, i.quantity AS stock,
+                       i.low_stock_threshold
                 FROM products p
                 JOIN categories c ON c.id = p.category_id
                 LEFT JOIN inventory i ON i.product_id = p.id
                 WHERE p.id = ?
-                """, productId);
+                """, rs -> {
+            if (rs.next()) return productMap(rs);
+            throw new EntityNotFoundException("Produit introuvable");
+        }, productId);
     }
 
     private java.util.Map<String, Object> orderMap(java.sql.ResultSet rs) throws java.sql.SQLException {

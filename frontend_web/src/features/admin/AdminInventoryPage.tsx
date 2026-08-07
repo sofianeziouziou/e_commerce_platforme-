@@ -35,7 +35,7 @@ export function AdminInventoryPage() {
   };
 
   const openEdit = (p: ProductItem) => {
-    setEditStock({ id: p.id, quantity: p.stock ?? 0, threshold: 5 });
+    setEditStock({ id: p.id, quantity: p.stock ?? 0, threshold: p.lowStockThreshold ?? 5 });
   };
 
   const handleSave = async () => {
@@ -48,13 +48,14 @@ export function AdminInventoryPage() {
   };
 
   const filtered = products.filter((p) => {
+    const thr = p.lowStockThreshold ?? 5;
     if (stockFilter === 'out') return p.stock != null && p.stock <= 0;
-    if (stockFilter === 'low') return p.stock != null && p.stock > 0 && p.stock <= 10;
-    if (stockFilter === 'ok') return p.stock == null || p.stock > 10;
+    if (stockFilter === 'low') return p.stock != null && p.stock > 0 && p.stock <= thr;
+    if (stockFilter === 'ok') return p.stock == null || p.stock > thr;
     return true;
   });
 
-  const lowStockProducts = products.filter((p) => p.stock != null && p.stock <= 10);
+  const lowStockProducts = products.filter((p) => p.stock != null && p.stock <= (p.lowStockThreshold ?? 5));
 
   const filterBtns: { key: StockFilter; label: string }[] = [
     { key: 'all', label: 'Tous' },
@@ -74,7 +75,7 @@ export function AdminInventoryPage() {
         <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4">
           <div className="flex items-center gap-2 text-orange-700">
             <AlertTriangle size={18} />
-            <span className="font-bold">{lowStockProducts.length} produit(s) en stock bas (&le;10)</span>
+            <span className="font-bold">{lowStockProducts.length} produit(s) sous le seuil d&apos;alerte</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {lowStockProducts.slice(0, 8).map((p) => (
@@ -132,8 +133,9 @@ export function AdminInventoryPage() {
             </thead>
             <tbody>
               {filtered.map((p) => {
+                const thr = p.lowStockThreshold ?? 5;
                 const isOut = p.stock != null && p.stock <= 0;
-                const isLow = p.stock != null && p.stock > 0 && p.stock <= 10;
+                const isLow = p.stock != null && p.stock > 0 && p.stock <= thr;
                 return (
                   <tr key={p.id} className="border-b border-slate-100 transition hover:bg-slate-50">
                     <td className="px-4 py-3">
@@ -150,7 +152,7 @@ export function AdminInventoryPage() {
                         {p.stock != null ? p.stock : '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">5</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{p.lowStockThreshold ?? '-'}</td>
                     <td className="px-4 py-3">
                       {isOut ? (
                         <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-black text-red-700">Rupture</span>

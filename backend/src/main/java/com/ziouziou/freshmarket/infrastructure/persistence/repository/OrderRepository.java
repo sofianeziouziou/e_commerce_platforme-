@@ -15,6 +15,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
 
+    boolean existsByAddressId(Long addressId);
+
     boolean existsByOrderNumber(String orderNumber);
 }
 

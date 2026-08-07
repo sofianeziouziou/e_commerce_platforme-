@@ -1,6 +1,7 @@
 package com.ziouziou.freshmarket.application.order;
 
 import com.ziouziou.freshmarket.application.exception.BusinessException;
+import com.ziouziou.freshmarket.application.promotion.PromotionPricingService;
 import com.ziouziou.freshmarket.domain.cart.Cart;
 import com.ziouziou.freshmarket.domain.cart.CartItem;
 import com.ziouziou.freshmarket.domain.catalog.Product;
@@ -16,7 +17,10 @@ import com.ziouziou.freshmarket.interfaces.rest.dto.order.OrderItemResponse;
 import com.ziouziou.freshmarket.interfaces.rest.dto.order.OrderResponse;
 import jakarta.persistence.EntityNotFoundException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,11 +38,12 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final AddressRepository addressRepository;
     private final StoreRepository storeRepository;
+    private final PromotionPricingService promotionPricingService;
 
     public OrderService(CustomerRepository customerRepository, CartRepository cartRepository,
                         CartItemRepository cartItemRepository, OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository, AddressRepository addressRepository,
-                        StoreRepository storeRepository) {
+                        StoreRepository storeRepository, PromotionPricingService promotionPricingService) {
         this.customerRepository = customerRepository;
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
@@ -46,6 +51,7 @@ public class OrderService {
         this.orderItemRepository = orderItemRepository;
         this.addressRepository = addressRepository;
         this.storeRepository = storeRepository;
+        this.promotionPricingService = promotionPricingService;
     }
 
     public OrderResponse createOrder(Long userId, CreateOrderRequest request) {
@@ -74,22 +80,40 @@ public class OrderService {
             orderNumber = "CMD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         }
 
-        BigDecimal deliveryFee = new BigDecimal("5.000");
-        BigDecimal subtotal = cartItems.stream()
-                .map(ci -> ci.getProduct().getPrice().multiply(ci.getQuantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal total = subtotal.add(deliveryFee);
+        BigDecimal deliveryFee = promotionPricingService.deliveryFee();
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal discountedSubtotal = BigDecimal.ZERO;
 
-        Order order = new Order(customer, store, address, orderNumber,
-                subtotal, deliveryFee, BigDecimal.ZERO, total, request.customerNote());
+        Map<Long, BigDecimal> promoPrices = promotionPricingService.effectivePrices(
+                store.getId(),
+                cartItems.stream().map(CartItem::getProduct).toList(),
+                OffsetDateTime.now());
 
+        List<OrderItem> itemsToAdd = new java.util.ArrayList<>();
         for (CartItem ci : cartItems) {
             Product product = ci.getProduct();
-            BigDecimal lineTotal = product.getPrice().multiply(ci.getQuantity());
-            OrderItem item = new OrderItem(product, product.getName(), product.getUnitLabel(),
-                    product.getPrice(), ci.getQuantity(), lineTotal);
-            order.addItem(item);
+            java.math.BigDecimal available = product.getInventory() == null
+                    ? java.math.BigDecimal.ZERO : product.getInventory().getQuantity();
+            if (available.compareTo(ci.getQuantity()) < 0) {
+                throw new BusinessException("INSUFFICIENT_STOCK",
+                        "Stock insuffisant pour \"" + product.getName() + "\" (disponible : "
+                                + available.stripTrailingZeros().toPlainString()
+                                + ", demande : " + ci.getQuantity().stripTrailingZeros().toPlainString() + ").");
+            }
+            BigDecimal unitPrice = promoPrices.getOrDefault(product.getId(), product.getPrice());
+            BigDecimal lineTotal = unitPrice.multiply(ci.getQuantity()).setScale(3, RoundingMode.HALF_UP);
+            subtotal = subtotal.add(product.getPrice().multiply(ci.getQuantity())).setScale(3, RoundingMode.HALF_UP);
+            discountedSubtotal = discountedSubtotal.add(lineTotal);
+            itemsToAdd.add(new OrderItem(product, product.getName(), product.getUnitLabel(),
+                    unitPrice, ci.getQuantity(), lineTotal));
         }
+
+        BigDecimal discountAmount = subtotal.subtract(discountedSubtotal).max(BigDecimal.ZERO);
+        BigDecimal total = discountedSubtotal.add(deliveryFee);
+
+        Order order = new Order(customer, store, address, orderNumber,
+                subtotal, deliveryFee, discountAmount, total, request.customerNote());
+        itemsToAdd.forEach(order::addItem);
 
         order = orderRepository.save(order);
 
@@ -121,9 +145,9 @@ public class OrderService {
     private OrderResponse toResponse(Order order) {
         Address addr = order.getAddress();
         AddressResponse addressResponse = addr != null ? new AddressResponse(
-                addr.getId(), "", addr.getRecipientName(), addr.getPhoneNumber(),
+                addr.getId(), addr.getLabel(), addr.getRecipientName(), addr.getPhoneNumber(),
                 addr.getStreetLine(), addr.getCity(), addr.getGovernorate(),
-                addr.getPostalCode(), addr.getLatitude(), addr.getLongitude(), false
+                addr.getPostalCode(), addr.getLatitude(), addr.getLongitude(), addr.isDefaultAddress()
         ) : null;
 
         List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());

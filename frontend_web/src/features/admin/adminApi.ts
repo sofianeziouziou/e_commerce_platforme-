@@ -76,6 +76,7 @@ export type ProductItem = {
   categoryName: string;
   categoryId?: number;
   stock: number | null;
+  lowStockThreshold: number | null;
 };
 
 export type OrderItem = {
@@ -102,6 +103,23 @@ export type PromotionItem = {
   endsAt: string;
   active: boolean;
   productCount: number;
+  categoryId?: number | null;
+};
+
+export type PromotionDetail = PromotionItem & {
+  productIds: number[];
+};
+
+export type PromotionRequest = {
+  name: string;
+  description?: string | null;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  productIds?: number[];
+  categoryId?: number | null;
 };
 
 export type CustomerItem = {
@@ -183,6 +201,22 @@ export function updateOrderStatus(token: string, id: number, status: string): Pr
 
 export function getPromotions(token: string): Promise<PromotionItem[]> {
   return apiGet<PromotionItem[]>('/admin/promotions', token);
+}
+
+export function getPromotionDetail(token: string, id: number): Promise<PromotionDetail> {
+  return apiGet<PromotionDetail>(`/admin/promotions/${id}`, token);
+}
+
+export function createPromotion(token: string, data: PromotionRequest): Promise<PromotionItem> {
+  return apiPost<PromotionItem>('/admin/promotions', data, token);
+}
+
+export function updatePromotion(token: string, id: number, data: PromotionRequest): Promise<PromotionItem> {
+  return apiPut<PromotionItem>(`/admin/promotions/${id}`, data, token);
+}
+
+export function deletePromotion(token: string, id: number): Promise<void> {
+  return apiDelete(`/admin/promotions/${id}`, token);
 }
 
 export function getCustomers(token: string, search?: string, page?: number): Promise<CustomerItem[]> {

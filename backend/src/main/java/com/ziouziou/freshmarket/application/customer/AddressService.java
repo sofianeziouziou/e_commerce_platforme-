@@ -4,6 +4,7 @@ import com.ziouziou.freshmarket.domain.customer.Address;
 import com.ziouziou.freshmarket.domain.customer.Customer;
 import com.ziouziou.freshmarket.infrastructure.persistence.repository.AddressRepository;
 import com.ziouziou.freshmarket.infrastructure.persistence.repository.CustomerRepository;
+import com.ziouziou.freshmarket.infrastructure.persistence.repository.OrderRepository;
 import com.ziouziou.freshmarket.interfaces.rest.dto.customer.AddressRequest;
 import com.ziouziou.freshmarket.interfaces.rest.dto.customer.AddressResponse;
 import jakarta.persistence.EntityNotFoundException;
@@ -17,10 +18,13 @@ public class AddressService {
 
     private final AddressRepository addressRepository;
     private final CustomerRepository customerRepository;
+    private final OrderRepository orderRepository;
 
-    public AddressService(AddressRepository addressRepository, CustomerRepository customerRepository) {
+    public AddressService(AddressRepository addressRepository, CustomerRepository customerRepository,
+                          OrderRepository orderRepository) {
         this.addressRepository = addressRepository;
         this.customerRepository = customerRepository;
+        this.orderRepository = orderRepository;
     }
 
     @Transactional(readOnly = true)
@@ -83,6 +87,10 @@ public class AddressService {
                 .orElseThrow(() -> new EntityNotFoundException("Adresse introuvable"));
         if (!address.getCustomer().getId().equals(customer.getId())) {
             throw new com.ziouziou.freshmarket.application.exception.BusinessException("FORBIDDEN", "Acces refuse.");
+        }
+        if (orderRepository.existsByAddressId(addressId)) {
+            throw new com.ziouziou.freshmarket.application.exception.BusinessException("ADDRESS_HAS_ORDERS",
+                    "Impossible de supprimer cette adresse : elle est liee a des commandes existantes.");
         }
         addressRepository.delete(address);
     }

@@ -66,8 +66,9 @@ export function CheckoutPage() {
 
   const itemCount = cart?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
   const subtotal = cart?.subtotal ?? 0;
-  const deliveryFee = 5.0;
-  const total = subtotal + deliveryFee;
+  const deliveryFee = cart?.deliveryFee ?? 0;
+  const discount = cart?.discountAmount ?? 0;
+  const total = cart?.totalAmount ?? 0;
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
 
   const STEP_LABELS: Record<Step, string> = { review: 'Panier', address: 'Adresse', confirm: 'Confirmation', done: 'Termine' };
@@ -259,6 +260,10 @@ export function CheckoutPage() {
                 <div className="flex justify-between py-2 font-bold">
                   <span>Livraison</span>
                   <span>{formatPrice(deliveryFee)}</span>
+                </div>
+                <div className="flex justify-between py-2 font-bold">
+                  <span>Remise</span>
+                  <span>{formatPrice(discount)}</span>
                 </div>
                 <div className="flex justify-between pt-2 text-base font-black">
                   <span>Total</span>

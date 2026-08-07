@@ -7,6 +7,7 @@ import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.ProductCreateRequest
 import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.ProductUpdateRequest;
 import com.ziouziou.freshmarket.interfaces.rest.dto.catalog.UpdateInventoryRequest;
 import com.ziouziou.freshmarket.interfaces.rest.dto.order.UpdateOrderStatusRequest;
+import com.ziouziou.freshmarket.interfaces.rest.dto.promotion.PromotionRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -116,6 +117,28 @@ public class AdminController {
     @GetMapping("/promotions")
     public List<Map<String, Object>> promotions(@AuthenticationPrincipal Jwt jwt) {
         return adminService.getPromotions(getUserId(jwt));
+    }
+
+    @GetMapping("/promotions/{id}")
+    public Map<String, Object> promotionDetail(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return adminService.getPromotionDetail(getUserId(jwt), id);
+    }
+
+    @PostMapping("/promotions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> createPromotion(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PromotionRequest request) {
+        return adminService.createPromotion(getUserId(jwt), request);
+    }
+
+    @PutMapping("/promotions/{id}")
+    public Map<String, Object> updatePromotion(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id, @Valid @RequestBody PromotionRequest request) {
+        return adminService.updatePromotion(getUserId(jwt), id, request);
+    }
+
+    @DeleteMapping("/promotions/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePromotion(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        adminService.deletePromotion(getUserId(jwt), id);
     }
 
     @GetMapping("/customers")
