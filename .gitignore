@@ -2,22 +2,19 @@
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+.vscode/
+.mvn/
 
 # Logs
 *.log
 logs/
 
 # Environment
-.env
-.env.*
+
 !.env.example
 
 # Backend
 backend/target/
-backend/.mvn/wrapper/maven-wrapper.jar
 
 # Frontend
 frontend_web/node_modules/
@@ -35,3 +32,10 @@ mobile/.packages
 # Docker / PostgreSQL local data
 .docker/postgres/data/
 
+# Fichiers de config racine (gardés en local uniquement)
+.editorconfig
+README.md
+docker-compose.yml
+package-lock.json
+docs/
+*.docx
