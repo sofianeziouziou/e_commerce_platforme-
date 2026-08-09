@@ -20,7 +20,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 export function ProductDetailPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token } = useAuth();
   const navigate = useNavigate();
   const { slug = '' } = useParams();
   const [product, setProduct] = useState<Product | null>(null);

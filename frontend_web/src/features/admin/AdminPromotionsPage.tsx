@@ -112,7 +112,8 @@ export function AdminPromotionsPage() {
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
   const toggleProduct = (productId: number) => {
-    set((f) => ({
+    setForm((f) => ({
+      ...f,
       productIds: f.productIds.includes(productId)
         ? f.productIds.filter((id) => id !== productId)
         : [...f.productIds, productId],

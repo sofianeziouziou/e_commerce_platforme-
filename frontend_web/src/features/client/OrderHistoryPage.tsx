@@ -5,11 +5,7 @@ import { PageShell } from '../../shared/ui/PageShell';
 import { useAuth } from '../auth/AuthContext';
 import { formatPrice } from '../catalog/catalogUtils';
 import { getOrders, type OrderResponse } from './clientApi';
-
-const STATUS_LABELS: Record<string, string> = {
-  EN_ATTENTE: 'En attente', CONFIRMEE: 'Confirmee', EN_PREPARATION: 'En preparation',
-  EXPEDIEE: 'Expediee', LIVREE: 'Livree', ANNULEE: 'Annulee',
-};
+import { ORDER_STATUS_LABELS } from '../../shared/utils/orderStatus';
 
 const STATUS_COLORS: Record<string, string> = {
   EN_ATTENTE: 'bg-amber-100 text-amber-800',
@@ -90,7 +86,7 @@ export function OrderHistoryPage() {
                   <div className="flex items-center gap-4 sm:flex-shrink-0">
                     <span className="font-black text-brand-ink">{formatPrice(order.totalAmount)}</span>
                     <span className={`rounded-full px-3 py-1 text-xs font-black ${STATUS_COLORS[order.status] || 'bg-slate-100 text-slate-800'}`}>
-                      {STATUS_LABELS[order.status] || order.status}
+                      {ORDER_STATUS_LABELS[order.status] || order.status}
                     </span>
                   </div>
                 </Link>

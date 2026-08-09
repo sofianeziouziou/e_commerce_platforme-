@@ -12,12 +12,6 @@ export default {
           surface: '#F8F9FA',
         },
       },
-      fontFamily: {
-        sans: ['Inter', 'Poppins', 'Nunito', 'system-ui', 'sans-serif'],
-      },
-      borderRadius: {
-        app: '16px',
-      },
       boxShadow: {
         soft: '0 16px 40px rgb(33 33 33 / 0.08)',
       },

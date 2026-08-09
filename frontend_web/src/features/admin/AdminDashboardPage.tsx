@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { useAuth } from '../auth/AuthContext';
 import { getDashboard, getOrders, type DashboardSummary, type OrderItem } from './adminApi';
+import { ORDER_STATUS_LABELS } from '../../shared/utils/orderStatus';
 
 export function AdminDashboardPage() {
   const { token } = useAuth();
@@ -58,10 +59,7 @@ export function AdminDashboardPage() {
     { label: 'Promotions actives', value: data?.activePromotions ?? 0, icon: Megaphone, color: 'bg-pink-500' },
   ];
 
-  const statusLabels: Record<string, string> = {
-    EN_ATTENTE: 'En attente', CONFIRMEE: 'Confirmee', EN_PREPARATION: 'En preparation',
-    EXPEDIEE: 'Expediee', LIVREE: 'Livree', ANNULEE: 'Annulee',
-  };
+  const statusLabels = ORDER_STATUS_LABELS;
 
   return (
     <AdminLayout>

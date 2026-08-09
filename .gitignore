@@ -10,7 +10,7 @@ Thumbs.db
 logs/
 
 # Environment
-
+.env
 !.env.example
 
 # Backend
@@ -30,12 +30,6 @@ mobile/build/
 mobile/.packages
 
 # Docker / PostgreSQL local data
-.docker/postgres/data/
-
-# Fichiers de config racine (gardés en local uniquement)
-.editorconfig
-README.md
-docker-compose.yml
-package-lock.json
-docs/
-*.docx
+.docker/postgres/data/git add .gitignore
+git add .
+git status

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, Tags, Box, Percent, ShoppingCart,
   Users, BarChart3, Settings, LogOut, Bell,
-  Sparkles, Menu, X, ShieldAlert
+  Menu, X, ShieldAlert
 } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
 import { useAuth } from '../auth/AuthContext';

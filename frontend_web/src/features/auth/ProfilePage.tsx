@@ -5,6 +5,7 @@ import { PageShell } from '../../shared/ui/PageShell';
 import { useAuth } from './AuthContext';
 import { updateProfile } from './authApi';
 import { getOrders, getUnreadCount, type OrderResponse } from '../client/clientApi';
+import { ORDER_STATUS_LABELS } from '../../shared/utils/orderStatus';
 
 export function ProfilePage() {
   const { user, token, logout } = useAuth();
@@ -42,10 +43,7 @@ export function ProfilePage() {
     navigate('/', { replace: true });
   };
 
-  const statusLabels: Record<string, string> = {
-    EN_ATTENTE: 'En attente', CONFIRMEE: 'Confirmee', EN_PREPARATION: 'En preparation',
-    EXPEDIEE: 'Expediee', LIVREE: 'Livree', ANNULEE: 'Annulee',
-  };
+  const statusLabels = ORDER_STATUS_LABELS;
   const statusColors: Record<string, string> = {
     EN_ATTENTE: 'bg-yellow-100 text-yellow-700', CONFIRMEE: 'bg-blue-100 text-blue-700',
     EN_PREPARATION: 'bg-purple-100 text-purple-700', EXPEDIEE: 'bg-indigo-100 text-indigo-700',

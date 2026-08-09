@@ -10,25 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    Optional<Product> findBySlug(String slug);
-
     Optional<Product> findByStoreIdAndSlug(Long storeId, String slug);
-
-    boolean existsBySlug(String slug);
-
-    boolean existsBySku(String sku);
-
-    Page<Product> findByActiveTrue(Pageable pageable);
 
     Page<Product> findByStoreIdAndActiveTrue(Long storeId, Pageable pageable);
 
-    Page<Product> findByActiveTrueAndCategorySlug(String categorySlug, Pageable pageable);
-
     Page<Product> findByStoreIdAndActiveTrueAndCategorySlug(Long storeId, String categorySlug, Pageable pageable);
-
-    Page<Product> findByActiveTrueAndNameContainingIgnoreCase(String keyword, Pageable pageable);
-
-    Page<Product> findByStoreIdAndActiveTrueAndNameContainingIgnoreCase(Long storeId, String keyword, Pageable pageable);
 
     @Query(value = """
             SELECT p.* FROM products p
@@ -40,8 +26,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
               AND unaccent(lower(p.name)) LIKE '%' || unaccent(lower(:keyword)) || '%'
             """, nativeQuery = true)
     Page<Product> searchByNameUnaccent(@Param("storeId") Long storeId, @Param("keyword") String keyword, Pageable pageable);
-
-    Page<Product> findByActiveTrueAndFeaturedTrue(Pageable pageable);
 
     Page<Product> findByStoreIdAndActiveTrueAndFeaturedTrue(Long storeId, Pageable pageable);
 }

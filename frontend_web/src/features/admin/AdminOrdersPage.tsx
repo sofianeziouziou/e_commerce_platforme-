@@ -1,22 +1,16 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { useAuth } from '../auth/AuthContext';
 import { getOrders, updateOrderStatus, getOrderDetail, type OrderItem, type AdminOrderDetail } from './adminApi';
+import { ORDER_STATUS_LABELS, ORDER_STATUS_STEPS } from '../../shared/utils/orderStatus';
 
 const statuses = ['EN_ATTENTE', 'CONFIRMEE', 'EN_PREPARATION', 'EXPEDIEE', 'LIVREE', 'ANNULEE'] as const;
-
-const statusLabels: Record<string, string> = {
-  EN_ATTENTE: 'En attente', CONFIRMEE: 'Confirmee', EN_PREPARATION: 'En preparation',
-  EXPEDIEE: 'Expediee', LIVREE: 'Livree', ANNULEE: 'Annulee',
-};
 
 const statusColors: Record<string, string> = {
   EN_ATTENTE: 'bg-yellow-100 text-yellow-700', CONFIRMEE: 'bg-blue-100 text-blue-700',
   EN_PREPARATION: 'bg-purple-100 text-purple-700', EXPEDIEE: 'bg-indigo-100 text-indigo-700',
   LIVREE: 'bg-green-100 text-green-700', ANNULEE: 'bg-red-100 text-red-700',
 };
-
-const statusSteps = ['EN_ATTENTE', 'CONFIRMEE', 'EN_PREPARATION', 'EXPEDIEE', 'LIVREE'];
 
 export function AdminOrdersPage() {
   const { token } = useAuth();
@@ -57,7 +51,7 @@ export function AdminOrdersPage() {
   };
 
   const currentStepIndex = (status: string) => {
-    const idx = statusSteps.indexOf(status);
+    const idx = ORDER_STATUS_STEPS.indexOf(status);
     return idx >= 0 ? idx : -1;
   };
 
@@ -72,7 +66,7 @@ export function AdminOrdersPage() {
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${filter === s ? 'bg-brand-ink text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
               onClick={() => { setFilter(s); setPage(0); }}
             >
-              {s ? statusLabels[s] : 'Toutes'}
+              {s ? ORDER_STATUS_LABELS[s] : 'Toutes'}
             </button>
           ))}
         </div>
@@ -87,7 +81,7 @@ export function AdminOrdersPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-xs font-black uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3">N°</th>
+                <th className="px-4 py-3">NÂ°</th>
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Total</th>
                 <th className="px-4 py-3">Statut</th>
@@ -107,7 +101,7 @@ export function AdminOrdersPage() {
                   <td className="px-4 py-3 font-bold">{o.totalAmount.toFixed(3)} TND</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ${statusColors[o.status] || 'bg-slate-100 text-slate-600'}`}>
-                      {statusLabels[o.status] || o.status}
+                      {ORDER_STATUS_LABELS[o.status] || o.status}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-500">{new Date(o.createdAt).toLocaleDateString('fr-FR')}</td>
@@ -118,7 +112,7 @@ export function AdminOrdersPage() {
                       disabled={updatingId === o.id}
                       onChange={(e) => handleStatusChange(o.id, e.target.value)}
                     >
-                      {statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}
+                      {statuses.map((s) => <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>)}
                     </select>
                   </td>
                   <td className="px-4 py-3">
@@ -161,7 +155,7 @@ export function AdminOrdersPage() {
             {detail.status !== 'ANNULEE' && (
               <div className="mb-6">
                 <div className="flex items-center gap-0">
-                  {statusSteps.map((s, i) => {
+                  {ORDER_STATUS_STEPS.map((s, i) => {
                     const step = currentStepIndex(detail.status);
                     const done = i <= step;
                     const current = i === step;
@@ -171,9 +165,9 @@ export function AdminOrdersPage() {
                           <span className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-black ${current ? 'bg-brand-green text-white' : done ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-400'}`}>
                             {done ? '\u2713' : i + 1}
                           </span>
-                          <span className={`text-xs font-bold ${current ? 'text-brand-green' : done ? 'text-green-600' : 'text-slate-400'}`}>{statusLabels[s]}</span>
+                          <span className={`text-xs font-bold ${current ? 'text-brand-green' : done ? 'text-green-600' : 'text-slate-400'}`}>{ORDER_STATUS_LABELS[s]}</span>
                         </div>
-                        {i < statusSteps.length - 1 && <div className={`mx-1 h-0.5 w-8 sm:w-12 ${done && i < step ? 'bg-green-400' : current ? 'bg-brand-green' : 'bg-slate-200'}`} />}
+                        {i < ORDER_STATUS_STEPS.length - 1 && <div className={`mx-1 h-0.5 w-8 sm:w-12 ${done && i < step ? 'bg-green-400' : current ? 'bg-brand-green' : 'bg-slate-200'}`} />}
                       </div>
                     );
                   })}

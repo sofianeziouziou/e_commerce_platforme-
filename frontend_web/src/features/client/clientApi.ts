@@ -159,10 +159,6 @@ export function getOrder(token: string, orderId: number): Promise<OrderResponse>
   return fetch(`${env.apiBaseUrl}/orders/${orderId}`, { headers: headers(token) }).then(handleResponse);
 }
 
-export function getProductById(token: string, productId: number): Promise<{ id: number; name: string; imageUrl: string; price: number; unitLabel: string; slug: string }> {
-  return fetch(`${env.apiBaseUrl}/catalog/products/${productId}`, { headers: headers(token) }).then(handleResponse);
-}
-
 export type NotificationItem = {
   id: number;
   title: string;

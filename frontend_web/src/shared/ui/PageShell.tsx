@@ -1,4 +1,4 @@
-import { Heart, LogIn, Menu, Search, ShoppingCart, Sparkles, User, PackageCheck, Bell } from 'lucide-react';
+import { Heart, LogIn, Menu, Search, ShoppingCart, Sparkles, User, Bell } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';

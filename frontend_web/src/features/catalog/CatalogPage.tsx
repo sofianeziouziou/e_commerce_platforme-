@@ -19,7 +19,7 @@ import { useAuth } from '../auth/AuthContext';
 import { getCatalogData } from './catalogApi';
 import { discountLabel, formatPrice, hasPromotion, isAvailable, sortProducts } from './catalogUtils';
 import type { Category, Product, Promotion, SortMode } from './types';
-import { addCartItem, getCart, removeCartItem, updateCartItem, type CartResponse, type CartItemResponse } from '../client/clientApi';
+import { addCartItem, getCart, removeCartItem, updateCartItem, type CartResponse } from '../client/clientApi';
 
 const persistedFavorites = 'freshmarket:favorites';
 
@@ -33,7 +33,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 export function CatalogPage() {
-  const { token, isAuthenticated } = useAuth();
+  const { token } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
