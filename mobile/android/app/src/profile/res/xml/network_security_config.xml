@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Autorise le HTTP en clair UNIQUEMENT en developpement, vers les hotes de
+  developpement locaux. Aucune exception en release : sur targetSdk 28+ le
+  trafic non chiffre est refuse par defant, ce qui est le comportement voulu.
+
+  L API de production doit etre servie en HTTPS.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- API backend sur la machine de developpement -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- L hote vu depuis l emulateur Android -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

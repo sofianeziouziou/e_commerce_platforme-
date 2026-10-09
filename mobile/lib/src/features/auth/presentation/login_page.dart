@@ -21,6 +21,24 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _submitting = false;
 
+  String? _redirectTo;
+  Map<String, dynamic>? _redirectArgs;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_redirectTo == null) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map<String, dynamic>) {
+        _redirectTo = args['redirectTo'] as String?;
+        final redirectArgs = args['redirectArgs'];
+        if (redirectArgs is Map) {
+          _redirectArgs = Map<String, dynamic>.from(redirectArgs);
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -39,7 +57,14 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
     setState(() => _submitting = false);
     if (ok) {
-      Navigator.of(context).pushReplacementNamed(Shell.route);
+      if (_redirectTo != null) {
+        Navigator.of(context).pushReplacementNamed(
+          _redirectTo!,
+          arguments: _redirectArgs,
+        );
+      } else {
+        Navigator.of(context).pushReplacementNamed(Shell.route);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(auth.error ?? 'Connexion impossible.')),

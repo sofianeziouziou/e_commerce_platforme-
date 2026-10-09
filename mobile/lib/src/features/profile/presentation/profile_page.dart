@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../app/shell.dart';
 import '../../../features/address/presentation/address_list_page.dart';
 import '../../../features/auth/presentation/auth_state.dart';
-import '../../../features/auth/presentation/login_page.dart';
 import '../../../features/notification/presentation/notification_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -74,7 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     await context.read<AuthState>().logout();
     if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(LoginPage.route, (route) => false);
+    Navigator.of(context).pushNamedAndRemoveUntil(Shell.route, (route) => false);
   }
 
   @override

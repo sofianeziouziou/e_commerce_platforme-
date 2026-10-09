@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../features/auth/presentation/auth_state.dart';
+import '../features/auth/presentation/login_page.dart';
 import '../features/cart/presentation/cart_page.dart';
 import '../features/cart/presentation/cart_state.dart';
 import '../features/catalog/presentation/catalog_page.dart';
@@ -22,31 +24,46 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthState>();
     final cart = context.watch<CartState>();
+
+    final guest = !auth.isAuthenticated;
     final pages = [
       const HomePage(),
       const CatalogPage(),
       const CartPage(),
-      const OrderListPage(),
-      const ProfilePage(),
+      if (!guest) const OrderListPage(),
+      if (!guest) const ProfilePage(),
     ];
+    final destinations = [
+      const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Accueil'),
+      const NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Catalogue'),
+      NavigationDestination(
+        icon: _CartBadge(icon: Icons.shopping_cart_outlined, count: cart.itemCount),
+        selectedIcon: _CartBadge(icon: Icons.shopping_cart, count: cart.itemCount),
+        label: 'Panier',
+      ),
+      if (guest)
+        const NavigationDestination(icon: Icon(Icons.login), selectedIcon: Icon(Icons.login), label: 'Connexion')
+      else ...[
+        const NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Commandes'),
+        const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profil'),
+      ],
+    ];
+    final currentIndex = _index < destinations.length ? _index : 0;
 
     return Scaffold(
-      body: IndexedStack(index: _index, children: pages),
+      body: IndexedStack(index: currentIndex, children: pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Accueil'),
-          const NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Catalogue'),
-          NavigationDestination(
-            icon: _CartBadge(icon: Icons.shopping_cart_outlined, count: cart.itemCount),
-            selectedIcon: _CartBadge(icon: Icons.shopping_cart, count: cart.itemCount),
-            label: 'Panier',
-          ),
-          const NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Commandes'),
-          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profil'),
-        ],
+        selectedIndex: currentIndex,
+        onDestinationSelected: (i) {
+          if (guest && i == 3) {
+            Navigator.of(context).pushNamed(LoginPage.route);
+            return;
+          }
+          setState(() => _index = i);
+        },
+        destinations: destinations,
       ),
     );
   }

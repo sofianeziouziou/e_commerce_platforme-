@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../features/auth/presentation/auth_state.dart';
+import '../../../features/auth/presentation/login_page.dart';
 import '../../../features/cart/presentation/cart_state.dart';
 import '../../../shared/widgets/error_view.dart';
 import '../../../shared/widgets/loading_view.dart';
@@ -64,6 +66,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   Future<void> _addToCart() async {
     final product = _product;
     if (product == null) return;
+    final auth = context.read<AuthState>();
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour ajouter des produits au panier.')),
+      );
+      Navigator.of(context).pushNamed(
+        LoginPage.route,
+        arguments: {
+          'redirectTo': ProductDetailPage.route,
+          'redirectArgs': {'slug': product.slug},
+        },
+      );
+      return;
+    }
     setState(() => _adding = true);
     final ok = await context.read<CartState>().add(productId: product.id, quantity: _quantity);
     if (!mounted) return;

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../../app/shell.dart';
 import '../../../features/auth/presentation/auth_state.dart';
-import '../../../features/auth/presentation/login_page.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -23,10 +22,16 @@ class _SplashPageState extends State<SplashPage> {
 
   Future<void> _bootstrap() async {
     final auth = context.read<AuthState>();
-    await auth.bootstrap();
+    try {
+      await auth.bootstrap();
+    } catch (_) {
+      // Ne jamais rester bloque sur le splash : en cas d'erreur (stockage,
+      // reseau, plugin), on poursuit vers l'accueil public.
+    }
     if (!mounted) return;
-    final next = auth.isAuthenticated ? Shell.route : LoginPage.route;
-    Navigator.of(context).pushReplacementNamed(next);
+    // L'acces au catalogue est public : tout le monde demarre sur l'accueil.
+    // La connexion n'est demandee que lorsqu'une action l'exige.
+    Navigator.of(context).pushReplacementNamed(Shell.route);
   }
 
   @override

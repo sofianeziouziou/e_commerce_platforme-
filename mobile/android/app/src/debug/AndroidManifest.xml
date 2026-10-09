@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- En developpement l API est servie en HTTP sur localhost : on autorise
+         explicitement le clair pour les hotes de dev, et uniquement eux. -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>

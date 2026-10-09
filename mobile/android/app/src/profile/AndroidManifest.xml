@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Le profil est mesure de performance sur l appareil : meme regle que le
+         debug, clair autorise pour les hotes de developpement uniquement. -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>

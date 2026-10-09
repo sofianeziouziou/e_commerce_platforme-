@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/network/api_client.dart';
 import '../core/theme/app_theme.dart';
 import '../features/address/presentation/address_form_page.dart';
 import '../features/address/presentation/address_list_page.dart';
@@ -25,7 +26,14 @@ class FreshMarketApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthState()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final auth = AuthState();
+            // JWT expire ou invalide : nettoyage de session local (mode invite).
+            ApiClient.onUnauthorized = auth.handleSessionExpired;
+            return auth;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => CartState()),
       ],
       child: MaterialApp(

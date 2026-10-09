@@ -32,4 +32,5 @@ mobile/.packages
 # Docker / PostgreSQL local data
 .docker/postgres/data/git add .gitignore
 git add .
-git status
+git status# Fichiers de configuration locale (ne pas versionner)
+config-local.properties

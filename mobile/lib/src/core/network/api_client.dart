@@ -16,6 +16,9 @@ class ApiClient {
 
   static const Duration _timeout = Duration(seconds: 20);
 
+  // Declenche le nettoyage de session quand le backend refuse un JWT (401).
+  static void Function()? onUnauthorized;
+
   Future<dynamic> get(String path) => _send('GET', path);
 
   Future<dynamic> post(String path, {Map<String, dynamic>? body}) =>
@@ -32,10 +35,11 @@ class ApiClient {
     Map<String, dynamic>? body,
   }) async {
     final token = await TokenStore.read();
+    final hadToken = token != null && token.isNotEmpty;
     final headers = <String, String>{
       'Accept': 'application/json',
       if (body != null) 'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (hadToken) 'Authorization': 'Bearer $token',
     };
 
     final uri = Uri.parse('$_baseUrl$path');
@@ -68,16 +72,20 @@ class ApiClient {
       );
     }
 
-    return _decode(response);
+    return _decode(response, hadToken: hadToken);
   }
 
-  dynamic _decode(http.Response response) {
+  dynamic _decode(http.Response response, {required bool hadToken}) {
     final statusCode = response.statusCode;
     final raw = response.body.isEmpty ? null : response.body;
 
     if (statusCode >= 200 && statusCode < 300) {
       if (raw == null) return null;
       return jsonDecode(raw);
+    }
+
+    if (statusCode == 401 && hadToken) {
+      onUnauthorized?.call();
     }
 
     throw _parseError(statusCode, raw);

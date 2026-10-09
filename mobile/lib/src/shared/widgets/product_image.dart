@@ -9,14 +9,20 @@ class ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Les dimensions infinies (ex. width: double.infinity) sont resumees
+    // par les contraintes du parent : une taille non finie (icone, image)
+    // provoquerait une assertion de rendu.
+    final double? boxWidth = width?.isFinite == true ? width : null;
+    final double? boxHeight = height?.isFinite == true ? height : null;
+
     final fallback = Container(
-      width: width,
-      height: height,
+      width: boxWidth,
+      height: boxHeight,
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       alignment: Alignment.center,
       child: Icon(
         Icons.local_grocery_store_outlined,
-        size: (width ?? 80) * 0.4,
+        size: (boxWidth ?? 80) * 0.4,
         color: Theme.of(context).colorScheme.outline,
       ),
     );
@@ -26,15 +32,15 @@ class ProductImage extends StatelessWidget {
 
     return Image.network(
       urlValue,
-      width: width,
-      height: height,
+      width: boxWidth,
+      height: boxHeight,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => fallback,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return Container(
-          width: width,
-          height: height,
+          width: boxWidth,
+          height: boxHeight,
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           alignment: Alignment.center,
           child: const SizedBox(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../features/auth/presentation/auth_state.dart';
+import '../../../features/auth/presentation/login_page.dart';
 import '../../../features/catalog/presentation/catalog_page.dart';
 import '../../../features/checkout/presentation/checkout_page.dart';
 import '../../../shared/widgets/empty_view.dart';
@@ -37,27 +39,53 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
+  void _startCheckout() {
+    final auth = context.read<AuthState>();
+    if (auth.isAuthenticated) {
+      Navigator.of(context).pushNamed(CheckoutPage.route);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Connectez-vous pour continuer votre commande.')),
+    );
+    Navigator.of(context).pushNamed(
+      LoginPage.route,
+      arguments: {'redirectTo': CheckoutPage.route},
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<CartState>();
+    final auth = context.watch<AuthState>();
     final cart = state.cart;
+    final guestCartError = !auth.isAuthenticated && state.unauthorized;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Panier')),
       body: state.loading && cart == null
           ? const LoadingView()
-          : state.error != null && cart == null
-              ? ErrorView(message: state.error!, onRetry: state.load)
-              : cart == null || cart.items.isEmpty
-                  ? EmptyView(
-                      icon: Icons.shopping_cart_outlined,
-                      title: 'Votre panier est vide',
-                      message: 'Decouvrez nos produits frais.',
-                      actionLabel: 'Voir le catalogue',
-                      onAction: () =>
-                          Navigator.of(context).pushNamed(CatalogPage.route),
-                    )
-                  : _buildContent(context, cart),
+          : guestCartError
+              ? EmptyView(
+                  icon: Icons.lock_outline,
+                  title: 'Connectez-vous pour retrouver votre panier',
+                  message: 'Votre panier est enregistre sur votre compte.',
+                  actionLabel: 'Se connecter',
+                  onAction: () =>
+                      Navigator.of(context).pushNamed(LoginPage.route),
+                )
+              : state.error != null && cart == null
+                  ? ErrorView(message: state.error!, onRetry: state.load)
+                  : cart == null || cart.items.isEmpty
+                      ? EmptyView(
+                          icon: Icons.shopping_cart_outlined,
+                          title: 'Votre panier est vide',
+                          message: 'Decouvrez nos produits frais.',
+                          actionLabel: 'Voir le catalogue',
+                          onAction: () =>
+                              Navigator.of(context).pushNamed(CatalogPage.route),
+                        )
+                      : _buildContent(context, cart),
     );
   }
 
@@ -75,7 +103,7 @@ class _CartPageState extends State<CartPage> {
             },
           ),
         ),
-        _SummaryBar(cart: cart),
+        _SummaryBar(cart: cart, onCheckout: _startCheckout),
       ],
     );
   }
@@ -150,9 +178,10 @@ class _CartItemTile extends StatelessWidget {
 }
 
 class _SummaryBar extends StatelessWidget {
-  const _SummaryBar({required this.cart});
+  const _SummaryBar({required this.cart, required this.onCheckout});
 
   final Cart cart;
+  final VoidCallback onCheckout;
 
   @override
   Widget build(BuildContext context) {
@@ -218,8 +247,7 @@ class _SummaryBar extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () =>
-                    Navigator.of(context).pushNamed(CheckoutPage.route),
+                onPressed: onCheckout,
                 child: const Text('Passer la commande'),
               ),
             ),

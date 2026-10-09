@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../app/shell.dart';
 import '../../../core/config/app_environment.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../features/catalog/data/catalog_repository.dart';
@@ -27,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   final NotificationRepository _notifications = NotificationRepository();
 
   bool _loading = true;
+  bool _loadingInProgress = false;
   String? _error;
   List<Category> _categories = const [];
   List<Product> _featured = const [];
@@ -39,29 +41,78 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _load() async {
+    // Protection contre les cycles multiples : un seul chargement a la fois.
+    if (_loadingInProgress) return;
+    _loadingInProgress = true;
+
+    final auth = context.read<AuthState>();
     setState(() {
       _loading = true;
       _error = null;
     });
+
+    // Chaque section est chargee independamment : un echec d'un endpoint
+    // (ex: notifications reservees aux connectes) ne doit pas faire echouer
+    // tout l'accueil public (produits + categories).
     try {
-      final results = await Future.wait([
-        _catalog.getCategories(),
-        _catalog.getFeatured(),
-        _notifications.getUnreadCount(),
-      ]);
+      // Borne maximale de chargement : en mode Web, une requete bloquee par
+      // la politique CORS peut ne jamais aboutir. On force alors la sortie de
+      // l'etat de chargement pour eviter un spinner infini.
+      const loadTimeout = Duration(seconds: 25);
+
+      final categoriesFuture = _catalog.getCategories().timeout(loadTimeout);
+      final featuredFuture = _catalog.getFeatured().timeout(loadTimeout);
+
+      List<Category> categories = const [];
+      List<Product> featured = const [];
+      Object? categoriesError;
+      Object? featuredError;
+
+      try {
+        categories = await categoriesFuture;
+      } on Exception catch (e) {
+        categoriesError = e;
+      }
+      try {
+        featured = await featuredFuture;
+      } on Exception catch (e) {
+        featuredError = e;
+      }
+
       if (!mounted) return;
+      if (categoriesError != null && featuredError != null) {
+        setState(() {
+          _error = 'Impossible de charger le catalogue.';
+          _loading = false;
+        });
+        return;
+      }
+
       setState(() {
-        _categories = results[0] as List<Category>;
-        _featured = results[1] as List<Product>;
-        _unreadCount = (results[2] as num).toInt();
-        _loading = false;
+        if (categoriesError == null) _categories = categories;
+        if (featuredError == null) _featured = featured;
       });
+
+      // Notification : optionnelle et reservee aux utilisateurs connectes.
+      // Ne jamais faire echouer l'accueil si elle est indisponible (401/403/
+      // erreur reseau) : on garde le compteur a 0.
+      if (auth.isAuthenticated) {
+        try {
+          final count = await _notifications.getUnreadCount().timeout(loadTimeout);
+          if (!mounted) return;
+          setState(() => _unreadCount = (count as num).toInt());
+        } on Exception {
+          // Ignore : le compteur reste a 0, l'accueil reste fonctionnel.
+        }
+      }
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
-        _loading = false;
       });
+    } finally {
+      _loadingInProgress = false;
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -71,25 +122,42 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('FreshMarket'),
         actions: [
-          IconButton(
-            icon: Badge(
-              isLabelVisible: _unreadCount > 0,
-              label: Text('$_unreadCount'),
-              child: const Icon(Icons.notifications_outlined),
-            ),
-            onPressed: () => Navigator.of(context).pushNamed(NotificationPage.route),
-          ),
           Consumer<AuthState>(
-            builder: (_, auth, __) => IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Se deconnecter',
-              onPressed: () {
-                auth.logout().then((_) {
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushNamedAndRemoveUntil(LoginPage.route, (route) => false);
-                });
-              },
-            ),
+            builder: (_, auth, __) {
+              if (!auth.isAuthenticated) {
+                return IconButton(
+                  icon: const Icon(Icons.login),
+                  tooltip: 'Se connecter',
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(LoginPage.route),
+                );
+              }
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Badge(
+                      isLabelVisible: _unreadCount > 0,
+                      label: Text('$_unreadCount'),
+                      child: const Icon(Icons.notifications_outlined),
+                    ),
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed(NotificationPage.route),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.logout),
+                    tooltip: 'Se deconnecter',
+                    onPressed: () {
+                      auth.logout().then((_) {
+                        if (!context.mounted) return;
+                        Navigator.of(context)
+                            .pushNamedAndRemoveUntil(Shell.route, (route) => false);
+                      });
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

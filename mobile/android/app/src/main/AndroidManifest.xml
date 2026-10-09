@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-        android:label="freshmarket_mobile"
+    <!-- L application appelle l API FreshMarket : la permission doit etre declaree
+         dans le manifest principal, sinon elle n existe que dans debug/ et profile/
+         et l APK release se retrouve sans aucun acces reseau. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+<application
+      android:label="FreshMarket"
+      android:networkSecurityConfig="@xml/network_security_config"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

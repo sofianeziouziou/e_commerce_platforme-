@@ -94,6 +94,15 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // JWT expire ou invalide en cours de session :
+  // on nettoie la session locale et on repasse en mode invite.
+  Future<void> handleSessionExpired() async {
+    await TokenStore.clear();
+    _user = null;
+    _status = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+
   Future<bool> updateProfile({
     required String firstName,
     required String lastName,

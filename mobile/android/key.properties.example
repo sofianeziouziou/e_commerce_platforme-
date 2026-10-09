@@ -1,0 +1,6 @@
+# Copiez ce fichier vers key.properties et renseignez les valeurs locales
+# NE JAMAIS versionner key.properties
+storeFile=/chemin/vers/freshmarket-release.jks
+storePassword=
+keyAlias=freshmarket-release
+keyPassword=
